@@ -11,8 +11,8 @@ LATEST_HEIGHT = 0
 TENDERMINT_RPC = config("TENDERMINT_RPC", "http://localhost:26657")
 
 
-async def load_block(session, n):
-    async with session.get(f"{TENDERMINT_RPC}/block?height={n}") as rsp:
+async def load_one(session, n, endpoint):
+    async with session.get(f"{TENDERMINT_RPC}{endpoint}?height={n}") as rsp:
         if rsp.status == 200:
             txt = await rsp.text()
             rsp = ujson.loads(txt)
@@ -21,10 +21,10 @@ async def load_block(session, n):
             return ujson.dumps(rsp["result"], indent=2)
 
 
-async def subscribe_new_blocks(offset):
+async def subscribe_rpc(offset, endpoint):
     async with aiohttp.ClientSession() as session:
         while True:
-            rsp = await load_block(session, offset)
+            rsp = await load_one(session, offset, endpoint)
             if rsp is None:
                 await asyncio.sleep(0.5)
                 continue
@@ -32,9 +32,14 @@ async def subscribe_new_blocks(offset):
             offset += 1
 
 
-@app.get("/new_block")
-async def new_blocks(offset: int = 1):
-    return StreamingResponse(subscribe_new_blocks(offset))
+@app.get("/blocks")
+async def blocks(offset: int = 1):
+    return StreamingResponse(subscribe_rpc(offset, "/block"))
+
+
+@app.get("/block_results")
+async def block_results(offset: int = 1):
+    return StreamingResponse(subscribe_rpc(offset, "/block_results"))
 
 
 if __name__ == "__main__":
