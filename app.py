@@ -7,7 +7,6 @@ from fastapi import FastAPI
 from starlette.responses import StreamingResponse
 
 app = FastAPI()
-LATEST_HEIGHT = 0
 TENDERMINT_RPC = config("TENDERMINT_RPC", "http://localhost:26657")
 
 

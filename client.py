@@ -11,13 +11,14 @@ async def amain(offset, url):
                 msg = await rsp.content.readany()
                 if msg is None:
                     break
-                print('block', json.loads(msg)["block"]["header"]["height"])
+                print("block result", json.loads(msg)["height"])
 
 
-def main(offset=1, url="http://localhost:8000/new_block"):
+def main(offset=1, url="http://localhost:8000/block_results"):
     asyncio.run(amain(offset, url))
 
 
 if __name__ == "__main__":
     import fire
+
     fire.Fire(main)

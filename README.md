@@ -27,7 +27,8 @@ $ TENDERMINT_RPC=http://localhost:26657 uvicorn app:app
 ```
 
 ```shell
-$ curl "http://localhost:8000/new_block?offset=10"
+$ curl "http://localhost:8000/blocks?offset=10"
+$ curl "http://localhost:8000/block_results?offset=10"
 ```
 
 `client.py` subscribe messges programatically.
