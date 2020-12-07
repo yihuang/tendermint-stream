@@ -3,6 +3,7 @@ CREATE TABLE "transfer" (
     "id" bigserial,
     "height" int NOT NULL,
     "txindex" int,
+    "evtindex" int NOT NULL,
     "sender" varchar NOT NULL,
     "recipient" varchar NOT NULL,
     "amount" varchar NOT NULL,
@@ -11,7 +12,7 @@ CREATE TABLE "transfer" (
 
 CREATE INDEX "transfers_sender_idx" ON "transfer"("sender");
 CREATE INDEX "transfers_recipient_idx" ON "transfer"("recipient");
-CREATE UNIQUE INDEX "transfers_txindex_height_idx" ON "transfer"("txindex","height");
+CREATE UNIQUE INDEX "transfers_txindex_height_idx" ON "transfer"("height","txindex","evtindex");
 """
 import base64
 
@@ -34,7 +35,11 @@ async def load_block_results(session, n):
 
 def parse_attrs(attrs):
     return {
-        base64.b64decode(item["key"]).decode(): base64.b64decode(item["value"]).decode()
+        base64.b64decode(item["key"]).decode(): (
+            base64.b64decode(item["value"]).decode()
+            if item["value"] is not None
+            else ""
+        )
         for item in attrs
     }
 
@@ -50,8 +55,8 @@ async def main():
         await pg.fetchval(
             "select last_handled_event_height from projections where id=$1", "Transfer"
         )
-        or 1
-    )
+        or 0
+    ) + 1
     async with aiohttp.ClientSession() as session:
         while True:
             rows = []
@@ -61,18 +66,25 @@ async def main():
                 continue
             for ev in rsp["begin_block_events"]:
                 if ev["type"] == "transfer":
-                    rows.append((offset, None) + process_transfer_event(ev))
+                    rows.append((offset, None, 0) + process_transfer_event(ev))
             for i, tx in enumerate(rsp["txs_results"] or []):
-                for ev in tx["events"]:
+                for j, ev in enumerate(tx["events"]):
                     if ev["type"] == "transfer":
-                        rows.append((offset, i) + process_transfer_event(ev))
+                        rows.append((offset, i, j) + process_transfer_event(ev))
             if rows:
                 async with pg.transaction():
                     # insert batch rows
                     await pg.copy_records_to_table(
                         "transfer",
                         records=rows,
-                        columns=("height", "txindex", "sender", "recipient", "amount"),
+                        columns=(
+                            "height",
+                            "txindex",
+                            "evtindex",
+                            "sender",
+                            "recipient",
+                            "amount",
+                        ),
                     )
                     # save last_handled_event_height
                     await pg.execute(
